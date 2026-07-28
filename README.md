@@ -12,7 +12,7 @@ Built and tested on genuinely low-spec hardware (Intel i3, 4GB RAM, mechanical H
 
 Existing Windows debloat/tweak tools (WinUtil, hellzerg/optimizer, and similar) hand you a big flat list and expect you to know what's safe on your machine. Flow detects your CPU, RAM, disk type, GPU, and OS build first, then filters the tweak list automatically — an HDD-only tweak never shows up on an SSD rig, a laptop-only power tweak never shows up on a desktop.
 
-- **202 tweaks**, individually researched and OS-gated (Win7 through Win11), every registry key traced to a real source — nothing invented to pad a number
+- **204 tweaks**, individually researched and OS-gated (Win7 through Win11), every registry key traced to a real source — nothing invented to pad a number
 - **Hardware-aware filtering** — tweaks are hidden, not just greyed out, if they don't apply to your disk type, RAM, GPU, or form factor
 - **4 tiers**: Minimal (zero risk) → Standard (recommended) → Maximal (aggressive) → Extreme (disables real security controls, never auto-suggested)
 - **Mandatory restore point** before any apply — no opt-out, no exceptions
@@ -23,15 +23,16 @@ Existing Windows debloat/tweak tools (WinUtil, hellzerg/optimizer, and similar) 
 
 ## Screenshots
 
-*(add screenshots here before publishing — `docs/screenshot-tweaks.png`, `docs/screenshot-audit.png`)*
+![Tweak Engine](docs/screenshot-tweaks.png)
+![System Audit](docs/screenshot-audit.png)
 
 ## Install & Run
 
 **Requirements:** Windows 10 or 11, Python 3.9+.
 
 ```powershell
-git clone https://github.com/Anish-132/Flow-Win-Opt.git
-cd Flow-Win-Opt
+git clone https://github.com/Anish-132/flow.git
+cd flow
 ```
 
 Easiest path — just double-click `flow.bat`. It self-elevates (UAC prompt), finds your Python install, and launches the GUI. No manual pip install needed — Flow vendors `pywebview` into a local `_flow_deps/` folder on first run if it isn't already installed, so nothing touches your system-wide Python packages.
@@ -43,6 +44,14 @@ python flow.py gui
 ```
 
 Run as **Administrator** — registry/service tweaks silently no-op without elevation (Flow tells you this in the GUI banner rather than failing quietly).
+
+### One-line install (optional)
+
+```powershell
+irm https://raw.githubusercontent.com/Anish-132/flow/main/bootstrap.ps1 | iex
+```
+
+Downloads Flow to a temp folder, runs it, and deletes the folder when you close the window. See [`bootstrap.ps1`](bootstrap.ps1) for exactly what it does — worth reading before piping anything to `iex`, including this.
 
 ## How tier selection works
 

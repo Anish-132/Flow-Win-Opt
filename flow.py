@@ -5838,18 +5838,72 @@ def _parse_chat_response(raw_text: str, valid_tweak_ids: List[str], valid_maint_
     }
 
 
+def _local_chat_fallback(profile: HardwareProfile, message: str, tier: str) -> dict:
+    """No-key mode. Not an LLM — plain keyword matching over the hardware
+    profile and the tier's own tweak list. Answers the common questions
+    (what's my hardware, what tier, find me tweaks about Y) without any
+    network call or API key. Never guesses at a tweak's effect beyond its
+    own stored description — if nothing matches, it says so and points at
+    the Tweak Engine tab instead of making something up."""
+    msg = message.lower()
+    tier = tier if tier in TIER_ORDER else "minimal"
+    tweaks = list_tweaks_for_tier(tier, profile)
+
+    def profile_summary() -> str:
+        disks = ", ".join(f"{d.media_type} {d.size_gb}GB" for d in profile.disks) or "none detected"
+        gpu = profile.gpus[0].name if profile.gpus else "none detected"
+        return (f"{profile.cpu.name}, {profile.cpu.physical_cores}c/{profile.cpu.logical_cores}t, "
+                f"{profile.ram.total_gb}GB RAM, {disks}, {gpu}, {profile.os_name}.")
+
+    greetings = ("hi", "hello", "hey", "sup", "yo")
+    if msg.strip(" !.?") in greetings:
+        return {"available": True, "provider": "Flow Assistant (offline)",
+                "reply": "Hey — running without an AI key right now, so I can only look things "
+                         "up locally: your hardware specs, the suggested tier, or search the "
+                         f"current tier's tweak list by keyword. {profile.suggested_tier.capitalize()} "
+                         "is the suggested tier for this machine.",
+                "select_ids": None, "select_maint_ids": None}
+
+    if any(k in msg for k in ("hardware", "spec", "cpu", "gpu", "ram", "disk", "machine")):
+        return {"available": True, "provider": "Flow Assistant (offline)",
+                "reply": profile_summary(), "select_ids": None, "select_maint_ids": None}
+
+    if any(k in msg for k in ("tier", "suggest", "recommend")):
+        return {"available": True, "provider": "Flow Assistant (offline)",
+                "reply": f"Suggested tier for this hardware: {profile.suggested_tier}. "
+                         f"{profile_summary()}",
+                "select_ids": None, "select_maint_ids": None}
+
+    matches = [t for t in tweaks if msg in t.name.lower() or msg in t.description.lower()
+               or any(w in t.name.lower() or w in t.description.lower()
+                      for w in msg.split() if len(w) > 3)]
+    if matches:
+        lines = [f"- {t.name} [{t.risk}]: {t.description[:140]}" for t in matches[:5]]
+        return {"available": True, "provider": "Flow Assistant (offline)",
+                "reply": "Closest matches in the current tier's tweak list:\n" + "\n".join(lines),
+                "select_ids": None, "select_maint_ids": None}
+
+    return {"available": True, "provider": "Flow Assistant (offline)",
+            "reply": "No AI key configured, so I'm running in offline lookup mode — I can share "
+                     "your hardware specs, the suggested tier, or search the current tier's "
+                     "tweaks by keyword. Nothing matched that in the tweak list. For full "
+                     "reasoning over free-form questions, add a key in Settings (see "
+                     ".env.example for the free-tier providers).",
+            "select_ids": None, "select_maint_ids": None}
+
+
 def ai_chat_reply(profile: HardwareProfile, message: str, history: List[dict], tier: str = "minimal") -> dict:
     """Same degrade-cleanly contract as ai_explain_tier()/ai_diagnose_failure():
-    no key configured or any network/parsing failure just returns
-    available=False with a readable reason, never raises across the bridge."""
+    any network/parsing failure returns available=False with a readable
+    reason, never raises across the bridge. No key configured no longer
+    hard-fails the tab — it drops to _local_chat_fallback() instead so the
+    Chat tab still does something useful with zero setup."""
     message = (message or "").strip()
     if not message:
         return {"available": False, "reason": "Empty message.", "reply": None}
     api_key, provider = get_ai_credentials()
     if not api_key or provider not in AI_PROVIDERS:
-        return {"available": False, "provider": None,
-                "reason": "No AI key configured. Add one in Settings, or set an env var (see .env.example).",
-                "reply": None}
+        return _local_chat_fallback(profile, message, tier)
     tier = tier if tier in TIER_ORDER else "minimal"
     tweaks = list_tweaks_for_tier(tier, profile)
     tweak_ids = [t.id for t in tweaks]
@@ -7349,17 +7403,15 @@ async function initChatTab() {
   const nokey = document.getElementById('chat-nokey');
   const input = document.getElementById('chat-input');
   const sendBtn = document.getElementById('btn-chat-send');
-  if (!status.configured) {
-    nokey.style.display = 'block';
-    input.disabled = true;
-    sendBtn.disabled = true;
-    badge.textContent = '';
-  } else {
-    badge.textContent = status.provider + (status.free ? ' (free tier)' : '');
-    if (!window._chatWelcomed) {
-      window._chatWelcomed = true;
-      chatAppendBubble('assistant', `Connected via ${status.provider}. Ask me anything about your hardware, a specific tweak, or what's safe on this machine.`);
-    }
+  nokey.style.display = 'none';
+  input.disabled = false;
+  sendBtn.disabled = false;
+  badge.textContent = 'Flow Assistant' + (status.configured ? '' : ' (offline)');
+  if (!window._chatWelcomed) {
+    window._chatWelcomed = true;
+    chatAppendBubble('assistant', status.configured
+      ? "Connected. Ask me anything about your hardware, a specific tweak, or what's safe on this machine."
+      : "No AI key configured — running in offline mode. I can share your hardware specs, the suggested tier, or search the current tier's tweaks by keyword. Add a key in Settings for full free-form reasoning.");
   }
 
   async function send() {
