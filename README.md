@@ -12,13 +12,13 @@ Built and tested on genuinely low-spec hardware (Intel i3, 4GB RAM, mechanical H
 
 Existing Windows debloat/tweak tools (WinUtil, hellzerg/optimizer, and similar) hand you a big flat list and expect you to know what's safe on your machine. Flow detects your CPU, RAM, disk type, GPU, and OS build first, then filters the tweak list automatically — an HDD-only tweak never shows up on an SSD rig, a laptop-only power tweak never shows up on a desktop.
 
-- **204 tweaks**, individually researched and OS-gated (Win7 through Win11), every registry key traced to a real source — nothing invented to pad a number
+- **202 tweaks**, individually researched and OS-gated (Win7 through Win11), every registry key traced to a real source — nothing invented to pad a number
 - **Hardware-aware filtering** — tweaks are hidden, not just greyed out, if they don't apply to your disk type, RAM, GPU, or form factor
 - **4 tiers**: Minimal (zero risk) → Standard (recommended) → Maximal (aggressive) → Extreme (disables real security controls, never auto-suggested)
 - **Mandatory restore point** before any apply — no opt-out, no exceptions
 - **Full revert tracking** — every tweak's previous value is captured before it's touched, not assumed
 - **Idle-time daemon** — optionally re-checks applied tweaks in the background and reapplies anything that silently drifted (Windows Update reset a service, etc.)
-- **Optional AI advisor** — plain-language explanation of why each tweak fits *your* specific hardware (Groq/Gemini free tier, or bring your own OpenAI/Anthropic/OpenRouter key)
+- **Optional AI advisor** — plain-language explanation of why each tweak fits *your* specific hardware (Groq/Gemini free tier, or bring your own OpenAI/Anthropic/OpenRouter key), with an offline fallback mode for hardware/tier/tweak lookups when no key is configured
 - **Zero required dependencies** beyond the standard library for every code path except the GUI shell itself
 
 ## Screenshots
@@ -31,8 +31,8 @@ Existing Windows debloat/tweak tools (WinUtil, hellzerg/optimizer, and similar) 
 **Requirements:** Windows 10 or 11, Python 3.9+.
 
 ```powershell
-git clone https://github.com/Anish-132/flow.git
-cd flow
+git clone https://github.com/Anish-132/Flow-Win-Opt.git
+cd Flow-Win-Opt
 ```
 
 Easiest path — just double-click `flow.bat`. It self-elevates (UAC prompt), finds your Python install, and launches the GUI. No manual pip install needed — Flow vendors `pywebview` into a local `_flow_deps/` folder on first run if it isn't already installed, so nothing touches your system-wide Python packages.
@@ -48,7 +48,7 @@ Run as **Administrator** — registry/service tweaks silently no-op without elev
 ### One-line install (optional)
 
 ```powershell
-irm https://raw.githubusercontent.com/Anish-132/flow/main/bootstrap.ps1 | iex
+irm https://raw.githubusercontent.com/Anish-132/Flow-Win-Opt/main/bootstrap.ps1 | iex
 ```
 
 Downloads Flow to a temp folder, runs it, and deletes the folder when you close the window. See [`bootstrap.ps1`](bootstrap.ps1) for exactly what it does — worth reading before piping anything to `iex`, including this.
@@ -77,7 +77,7 @@ Full subcommand list: `python flow.py --help` (or see the bottom of `flow.py`).
 
 Copy `.env.example` to `.env` and fill in one API key, or paste one directly in the GUI's Settings panel (gear icon). Groq and Gemini both have genuinely free tiers with no card required. The AI **never chooses which tweaks apply** — `TWEAK_DATABASE` and the hardware filter are the only things that decide that. All the AI does is narrate, in plain language, why a tweak matters for your specific detected hardware, and flag anything worth double-checking.
 
-No key configured → the feature is simply hidden. Nothing breaks.
+No key configured → the AI Chat tab drops to an offline fallback (hardware specs, suggested tier, keyword search over the current tier's tweaks) instead of disabling entirely. Full free-form reasoning still needs a key.
 
 ## Safety model
 
