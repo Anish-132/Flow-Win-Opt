@@ -1,0 +1,25 @@
+# Flow runtime/user state — never commit real machine data
+flow_revert_log.json
+flow_daemon_log.jsonl
+flow_daemon_status.json
+flow_daemon_blocklist.json
+flow_daemon_driftstreak.json
+flow_profile_cache.json
+_flow_deps/
+
+# Secrets
+.env
+ai_config.json
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+
+# OS/editor cruft
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
