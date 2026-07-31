@@ -19,6 +19,22 @@ any script fetched over `irm | iex`, not just this project's.
 
 $ErrorActionPreference = "Stop"
 
+# ANSI Shadow-style block banner, same style WinUtil/christitus.com uses.
+# Printed first, before any downloading/elevation happens, so it shows up
+# immediately whether this is run via `irm | iex` or as a saved .ps1 --
+# and works from a plain PowerShell prompt, no external figlet dependency.
+$banner = @"
+███████╗██╗      ██████╗ ██╗    ██╗
+██╔════╝██║     ██╔═══██╗██║    ██║
+█████╗  ██║     ██║   ██║██║ █╗ ██║
+██╔══╝  ██║     ██║   ██║██║███╗██║
+██║     ███████╗╚██████╔╝╚███╔███╔╝
+╚═╝     ╚══════╝ ╚═════╝  ╚══╝╚══╝
+"@
+Write-Host $banner -ForegroundColor Cyan
+Write-Host "  Windows System Optimizer" -ForegroundColor DarkCyan
+Write-Host "  github.com/Anish-132/Flow-Win-Opt`n" -ForegroundColor DarkGray
+
 $repoRaw = "https://raw.githubusercontent.com/Anish-132/Flow-Win-Opt/main"
 $tempDir = Join-Path $env:TEMP ("flow_" + [guid]::NewGuid().ToString("N"))
 
