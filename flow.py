@@ -8292,6 +8292,24 @@ def _pywebview_deps_dir() -> str:
     return os.path.join(os.path.dirname(os.path.abspath(__file__)), "_flow_deps")
 
 
+def _webview2_data_dir() -> str:
+    """WebView2's user-data folder needs to be a *stable* path -- same real
+    directory, same account context, every single run. Anchoring it to
+    __file__'s folder (the old approach) only holds up for a plain git-clone
+    install; under bootstrap.ps1, __file__ lives inside a freshly generated
+    temp folder every run, which recreates the exact elevated/unelevated
+    account mismatch this workaround exists to dodge (see WEBVIEW2_USER_DATA_FOLDER
+    docs). %LOCALAPPDATA% is per-user and constant regardless of where
+    flow.py itself happens to be running from, so use that when available
+    and only fall back to the script-relative dir if it's missing."""
+    local_appdata = os.environ.get("LOCALAPPDATA")
+    if local_appdata:
+        base = os.path.join(local_appdata, "Flow")
+    else:
+        base = _pywebview_deps_dir()
+    return os.path.join(base, "webview2_data")
+
+
 def _import_pywebview():
     """Try importing pywebview with the vendored deps dir on sys.path first
     (so a vendored copy wins over any system install). Returns the module,
@@ -8579,7 +8597,14 @@ def _launch_gui_inner():
     # Microsoft's own documented workaround (the WEBVIEW2_USER_DATA_FOLDER
     # env var), not a hack. Must be set before webview.create_window() --
     # WebView2 reads it once, at environment-creation time.
-    webview2_data_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "_flow_deps", "webview2_data")
+    #
+    # This has to be anchored to %LOCALAPPDATA%, NOT to __file__'s folder --
+    # under bootstrap.ps1, flow.py runs from a freshly generated temp folder
+    # every single launch, so a script-relative path is a *different* real
+    # directory each time, which is exactly the "unstable path" scenario
+    # that triggers the elevated/unelevated account mismatch this workaround
+    # exists to avoid. See _webview2_data_dir().
+    webview2_data_dir = _webview2_data_dir()
     os.makedirs(webview2_data_dir, exist_ok=True)
     os.environ["WEBVIEW2_USER_DATA_FOLDER"] = webview2_data_dir
 
