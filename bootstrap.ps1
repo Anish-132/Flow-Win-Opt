@@ -35,6 +35,37 @@ Write-Host $banner -ForegroundColor Cyan
 Write-Host "  Windows System Optimizer" -ForegroundColor DarkCyan
 Write-Host "  github.com/Anish-132/Flow-Win-Opt`n" -ForegroundColor DarkGray
 
+function Test-RealPython {
+    # Windows ships a fake "python" stub (App Execution Alias) that opens
+    # the Store even when no interpreter is installed. Check real output.
+    try {
+        $out = & python --version 2>&1
+        if ($LASTEXITCODE -eq 0 -and $out -match "Python \d") { return $true }
+    } catch {}
+    return $false
+}
+
+if (-not (Test-RealPython)) {
+    Write-Host "Python not found — installing via winget..." -ForegroundColor Yellow
+    if (-not (Get-Command winget -ErrorAction SilentlyContinue)) {
+        Write-Host "winget is not available. Install Python manually from python.org (check 'Add to PATH'), then re-run this script." -ForegroundColor Red
+        exit 1
+    }
+    winget install -e --id Python.Python.3.12 --scope machine --accept-source-agreements --accept-package-agreements
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "Python install failed. Install manually from python.org, then re-run this script." -ForegroundColor Red
+        exit 1
+    }
+    $env:Path = [System.Environment]::GetEnvironmentVariable("Path","Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path","User")
+    if (-not (Test-RealPython)) {
+        Write-Host "Python installed but not on PATH yet. Close this window, reopen PowerShell, and re-run bootstrap." -ForegroundColor Red
+        exit 1
+    }
+    Write-Host "Python installed OK." -ForegroundColor Green
+} else {
+    Write-Host "Python found." -ForegroundColor Green
+}
+
 $repoRaw = "https://raw.githubusercontent.com/Anish-132/Flow-Win-Opt/main"
 $tempDir = Join-Path $env:TEMP ("flow_" + [guid]::NewGuid().ToString("N"))
 
