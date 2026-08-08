@@ -6825,12 +6825,18 @@ function formatAge(isoDate) {
 const GROUP_MAP = {
   privacy: 'Privacy & Telemetry', telemetry: 'Privacy & Telemetry',
   cloud: 'Privacy & Telemetry', notifications: 'Privacy & Telemetry',
-  visual: 'Performance', power: 'Performance', memory: 'Performance',
+  visual: 'Appearance (UI/UX)',
+  power: 'Performance', memory: 'Performance',
   gaming: 'Performance', storage: 'Performance', accessibility: 'Performance',
   service: 'Services', security: 'Services', startup: 'Services', bloatware: 'Services',
   network: 'Maintenance & Updates', explorer: 'Maintenance & Updates',
 };
-const GROUP_ORDER = ['Privacy & Telemetry', 'Performance', 'Services', 'Maintenance & Updates', 'Other'];
+const GROUP_ORDER = ['Privacy & Telemetry', 'Performance', 'Services', 'Maintenance & Updates', 'Other', 'Appearance (UI/UX)'];
+// Appearance/UI tweaks (theme, taskbar alignment, transparency, etc.) are
+// opt-in only -- never auto-selected, never applied unless the user
+// explicitly checks them. Flow does not touch anything the user's eyes
+// see by default.
+const NEVER_AUTO_SELECT_CATEGORY = 'visual';
 
 // ---------------------------------------------------------------------
 // Tab switching
@@ -7236,7 +7242,11 @@ async function refreshTweaks(tier) {
 
   const tweaks = await window.pywebview.api.list_tweaks(tier);
   window._currentTweaks = tweaks;
-  window._selectedTweakIds = new Set(tweaks.map(t => t.id));
+  // Appearance/visual tweaks start unchecked -- everything else starts
+  // checked, same as before.
+  window._selectedTweakIds = new Set(
+    tweaks.filter(t => t.category !== NEVER_AUTO_SELECT_CATEGORY).map(t => t.id)
+  );
 
   const fitLine = document.getElementById('hw-fit-line');
   fitLine.textContent = `${tweaks.length} tweak${tweaks.length === 1 ? '' : 's'} fit this machine at "${tier}" — hardware-inapplicable entries already filtered out.`;
@@ -7259,11 +7269,12 @@ async function refreshTweaks(tier) {
   GROUP_ORDER.forEach(g => {
     const items = groups.get(g);
     if (!items || !items.length) return;
-    html += `<div class="cat-section"><div class="cat-header">${escapeHtml(g)} <span class="count">&middot; ${items.length}</span></div><div class="tweak-grid">`;
+    const catIds = items.map(t => t.id).join(',');
+    html += `<div class="cat-section"><div class="cat-header" data-cat-ids="${catIds}" title="Click to toggle all ${escapeHtml(g)} tweaks" style="cursor:pointer;user-select:none;">${escapeHtml(g)} <span class="count">&middot; ${items.length}</span></div><div class="tweak-grid">`;
     html += items.map(t => `
       <label class="tweak-row" data-id="${t.id}">
         <span class="switch">
-          <input type="checkbox" class="tweak-check" id="chk-${t.id}" checked>
+          <input type="checkbox" class="tweak-check" id="chk-${t.id}" ${t.category === NEVER_AUTO_SELECT_CATEGORY ? '' : 'checked'}>
           <span class="track"></span><span class="thumb"></span>
         </span>
         <span class="tweak-label">
@@ -7289,12 +7300,33 @@ function renderSelectionSummary() {
   document.getElementById('btn-apply').disabled = selected === 0;
 }
 
+document.getElementById('tweak-list').addEventListener('click', (e) => {
+  const header = e.target.closest('.cat-header');
+  if (!header) return;
+  const ids = header.dataset.catIds.split(',').filter(Boolean);
+  if (!ids.length) return;
+  const sel = window._selectedTweakIds || new Set();
+  const allChecked = ids.every(id => sel.has(id));
+  ids.forEach(id => {
+    const el = document.getElementById('chk-' + id);
+    if (el) el.checked = !allChecked;
+    if (allChecked) sel.delete(id); else sel.add(id);
+  });
+  window._selectedTweakIds = sel;
+  renderSelectionSummary();
+});
 document.getElementById('select-all-link').addEventListener('click', (e) => { e.preventDefault(); setAllTweaksChecked(true); });
 document.getElementById('select-none-link').addEventListener('click', (e) => { e.preventDefault(); setAllTweaksChecked(false); });
 function setAllTweaksChecked(checked) {
-  const ids = (window._currentTweaks || []).map(t => t.id);
-  window._selectedTweakIds = new Set(checked ? ids : []);
-  document.querySelectorAll('.tweak-check').forEach(el => { el.checked = checked; });
+  // "Select all" never sweeps in Appearance/visual tweaks -- those stay
+  // opt-in only, toggled individually or via their own category header.
+  const nonVisual = (window._currentTweaks || []).filter(t => t.category !== NEVER_AUTO_SELECT_CATEGORY).map(t => t.id);
+  window._selectedTweakIds = new Set(checked ? nonVisual : []);
+  document.querySelectorAll('.tweak-check').forEach(el => {
+    const id = el.id.replace(/^chk-/, '');
+    const t = (window._currentTweaks || []).find(x => x.id === id);
+    el.checked = checked && t && t.category !== NEVER_AUTO_SELECT_CATEGORY;
+  });
   renderSelectionSummary();
 }
 
